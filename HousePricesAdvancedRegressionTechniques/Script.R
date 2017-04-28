@@ -35,7 +35,74 @@ library('rpart')
 completeDataset <- dataset[which(complete.cases(dataset) == TRUE),]
 incompleteDataset <- dataset[which(complete.cases(dataset) == FALSE),]
 
+
+#Apply Bayesian network to undermine relationships between the variables and then try to impute the missing values
+
+
+lotFrontageModel <- rpart(LotFrontage ~ ., data = completeDataset, control = rpart.control(minsplit = 100))
+
+lotFrontageMissing <- incompleteDataset[is.na(incompleteDataset$LotFrontage),]
+lotFrontageMissing$LotFrontage <- 2000
+lotFrontageMissingDataset <- rbind(completeDataset, lotFrontageMissing)
+lotFrontageModel <- rpart(LotFrontage ~ ., data = lotFrontageMissingDataset)
+fancyRpartPlot(lotFrontageModel)
+which(lotFrontageMissingDataset[!lotFrontageMissingDataset$BldgType %in% c('Twnhs','TwnhsE') & lotFrontageMissingDataset$LotFrontage == 0,])
+print(lotFrontageModel)
+plot(lotFrontageModel)
+new <- prp(lotFrontageModel, snip = TRUE)$obj
+fancyRpartPlot(new)
+
+newComplete <- completeDataset
+character_vars <- lapply(newComplete, class) == "character"
+newComplete[, character_vars] <- lapply(newComplete[, character_vars], as.factor)
+newComplete$GarageYrBlt <- as.integer(newComplete$GarageYrBlt)
+unlist(lapply(newComplete[, character_vars], FUN = function(x) length(levels(x))))
+
+
+
+#Computing varaible importance via random forest on the complete cases
+forest <- randomForest(SalePrice ~ ., data = lotFrontageMissingDataset, ntree = 100, impotance = TRUE)
+b <- importance(forest)
+sort(b[,1])
+
+
+library(mlbench)
+library(caret)
+control <- rfeControl(functions=rfFuncs, method="cv", number=10)
+results <- rfe(newComplete[,1:79], newComplete[,80], sizes=c(1:79), rfeControl=control)
+
+
+
+
+
+length(which(complete.cases(lotFrontageMissing) == FALSE))
+
 lotFrontageModel <- rpart(LotFrontage ~ ., data = completeDataset)
+plot(completeDataset$LotFrontage, completeDataset$LotArea)
+
+#Plotting the tree
+install.packages('rattle')
+install.packages('rpart.plot')
+install.packages('RColorBrewer')
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+
+fancyRpartPlot(lotFrontageModel)
+plot(lm(LotFrontage ~ LotArea, data = dataset))
+
+#Cleaning all other NAs in othe variables
+incompleteDataset_LotFrontageNa <- incompleteDataset[is.na(incompleteDataset$LotFrontage) & !is.na(incompleteDataset$MasVnrArea) & !is.na(incompleteDataset$Utilities) & !is.na(incompleteDataset$MSZoning),]
+
+incompleteDataset_LotFrontageNa <- incompleteDataset_LotFrontageNa[incompleteDataset_LotFrontageNa$Utilities != 'NoSeWa',]
+incompleteDataset_LotFrontageNa <- incompleteDataset_LotFrontageNa[!incompleteDataset_LotFrontageNa$Condition2 %in% c('RRAe','RRAn') ,]
+incompleteDataset_LotFrontageNa <- incompleteDataset_LotFrontageNa[!incompleteDataset_LotFrontageNa$RoofMatl %in% c('Metal') ,]
+incompleteDataset_LotFrontageNa <- incompleteDataset_LotFrontageNa[!incompleteDataset_LotFrontageNa$Heating %in% c('Floor') ,]
+
+
+predict(lotFrontageModel, incompleteDataset_LotFromtageNa)
+
+levels(as.factor(completeDataset$Utilities))
 
 which(is.na(incompleteDataset[, 1:3]))
 
